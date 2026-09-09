@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Heißhunger-Tracker</title>
+<style>
+  :root {
+    --bg: #0f0f11;
+    --surface: #1a1a1e;
+    --surface2: #242428;
+    --border: #2e2e34;
+    --text: #f0ede8;
+    --text-muted: #8a8790;
+    --accent: #e85d26;
+    --accent-soft: #c4440e;
+    --success: #3d9e6a;
+    --warning: #d4a017;
+    --danger: #d43838;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+  [data-theme="light"] {
+    --bg: #f7f4f0;
+    --surface: #ffffff;
+    --surface2: #f0ece6;
+    --border: #ddd9d3;
+    --text: #1a1714;
+    --text-muted: #7a7570;
+    --shadow: 0 4px 20px rgba(0,0,0,0.1);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+  /* Layout */
+  .app { max-width: 680px; margin: 0 auto; padding: 0 16px 80px; }
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 0 -16px;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { font-size: 26px; }
+  .logo-text { font-size: 18px; font-weight: 700; }
+  .header-actions { display: flex; gap: 8px; }
+  /* Nav */
+  nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--surface); border-top: 1px solid var(--border);
+    display: flex; justify-content: space-around;
+    padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+    z-index: 100;
+  }
+  nav button {
+    background: none; border: none; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 3px; padding: 4px 16px; color: var(--text-muted);
+    font-size: 11px; font-weight: 500; transition: color .15s;
+  }
+  nav button.active { color: var(--accent); }
+  nav button svg { width: 22px; height: 22px; }
+  /* Cards */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+    margin-top: 16px;
+  }
+  .card-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; font-size: 12px; }
+  /* Forms */
+  .form-group { margin-bottom: 14px; }
+  label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--text-muted); }
+  input[type="text"], input[type="datetime-local"], textarea, select {
+    width: 100%; padding: 10px 12px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text);
+    font-size: 14px; font-family: inherit;
+    transition: border-color .15s;
+    outline: none;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 80px; }
+  select option { background: var(--surface2); }
+  /* Intensity Slider */
+  .intensity-wrap { position: relative; }
+  .intensity-track {
+    display: flex; gap: 4px; margin-bottom: 6px;
+  }
+  .intensity-dot {
+    flex: 1; height: 8px; border-radius: 4px;
+    background: var(--border); cursor: pointer;
+    transition: background .12s;
+  }
+  .intensity-dot.active { background: var(--accent); }
+  .intensity-dot.low { background: #3d9e6a; }
+  .intensity-dot.mid { background: #d4a017; }
+  .intensity-dot.high { background: var(--accent); }
+  .intensity-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); }
+  /* Reaction pills */
+  .pill-group { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill {
+    padding: 7px 14px; border-radius: 20px;
+    border: 1.5px solid var(--border);
+    background: transparent; color: var(--text);
+    cursor: pointer; font-size: 13px; font-weight: 500;
+    transition: all .15s;
+  }
+  .pill:hover { border-color: var(--accent); }
+  .pill.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .pill.selected.good { background: var(--success); border-color: var(--success); }
+  .pill.selected.neutral { background: var(--warning); border-color: var(--warning); color: #1a1a1a; }
+  /* Buttons */
+  .btn {
+    padding: 11px 20px; border-radius: var(--radius-sm);
+    border: none; cursor: pointer; font-size: 14px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: opacity .15s, transform .1s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { opacity: .9; }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--accent); }
+  .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn-block { width: 100%; justify-content: center; }
+  /* Stat tiles */
+  .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 16px; }
+  .stat-tile {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .stat-value { font-size: 28px; font-weight: 700; }
+  .stat-label { font-size: 12px; color: var(--text-muted); }
+  .stat-value.good { color: var(--success); }
+  .stat-value.warn { color: var(--warning); }
+  .stat-value.bad { color: var(--danger); }
+  /* Entry List */
+  .entry-item {
+    display: flex; gap: 14px; align-items: flex-start;
+    padding: 14px 0; border-bottom: 1px solid var(--border);
+  }
+  .entry-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .entry-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    margin-top: 6px; flex-shrink: 0;
+  }
+  .entry-meta { flex: 1; min-width: 0; }
+  .entry-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .entry-time { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .entry-title { font-size: 14px; font-weight: 600; }
+  .entry-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .tag {
+    font-size: 11px; padding: 2px 8px; border-radius: 10px;
+    background: var(--surface2); color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+  .tag.outcome-gut { background: #1a3d28; color: #6ecb97; border-color: #3d9e6a; }
+  .tag.outcome-teils { background: #3d2e00; color: #e8c766; border-color: #d4a017; }
+  .tag.outcome-nachgegeben { background: #3d1414; color: #e87b7b; border-color: #d43838; }
+  .entry-note { font-size: 13px; color: var(--text-muted); margin-top: 4px; white-space: pre-line; }
+  .entry-actions { display: flex; gap: 6px; }
+  /* Strategies */
+  .strategy-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 0; border-bottom: 1px solid var(--border);
+  }
+  .strategy-item:last-child { border-bottom: none; }
+  .strategy-name { font-size: 14px; font-weight: 500; }
+  .strategy-count { font-size: 12px; color: var(--text-muted); }
+  .strategy-bar { height: 4px; background: var(--border); border-radius: 2px; margin-top: 4px; }
+  .strategy-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .3s; }
+  /* Page visibility */
+  .page { display: none; padding-top: 16px; }
+  .page.active { display: block; }
+  /* Toast */
+  #toast {
+    position: fixed; top: 70px; left: 50%; transform: translateX(-50%) translateY(-20px);
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 10px 20px; border-radius: 20px;
+    font-size: 13px; font-weight: 500;
+    opacity: 0; transition: all .3s; pointer-events: none; z-index: 999;
+    white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  /* Empty state */
+  .empty { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty p { font-size: 14px; }
+  /* Modal */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6);
+    display: flex; align-items: flex-end; z-index: 200;
+    opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--surface); border-radius: var(--radius) var(--radius) 0 0;
+    padding: 20px; width: 100%; max-height: 70vh; overflow-y: auto;
+    transform: translateY(100%); transition: transform .25s;
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+  /* Chart */
+  .chart-wrap { overflow-x: auto; margin-top: 8px; }
+  .chart-bars { display: flex; align-items: flex-end; gap: 6px; min-height: 80px; }
+  .chart-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; min-width: 28px; }
+  .chart-bar {
+    width: 100%; border-radius: 4px 4px 0 0;
+    transition: height .4s;
+  }
+  .chart-day-label { font-size: 10px; color: var(--text-muted); }
+  /* Divider */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+  /* Section heading */
+  .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  /* Theme toggle */
+  .icon-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); padding: 6px;
+    border-radius: var(--radius-sm); transition: color .15s;
+    display: flex; align-items: center;
+  }
+  .icon-btn:hover { color: var(--text); }
+  /* Intensity number badge */
+  .intensity-badge {
+    display: inline-block; width: 28px; height: 28px;
+    border-radius: 50%; background: var(--accent);
+    color: #fff; font-size: 12px; font-weight: 700;
+    text-align: center; line-height: 28px;
+  }
+  /* Streak */
+  .streak-wrap { display: flex; align-items: center; gap: 10px; }
+  .streak-num { font-size: 40px; font-weight: 800; color: var(--accent); }
+  .streak-label { font-size: 13px; color: var(--text-muted); }
+  @media (max-width: 400px) {
+    .stats-grid { grid-template-columns: 1fr; }
+  }
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-icon">🔥</span>
+    <span class="logo-text">Heißhunger</span>
+  </div>
+  <div class="header-actions">
+    <button class="icon-btn" id="themeBtn" title="Theme wechseln">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+      </svg>
+    </button>
+    <button class="icon-btn" id="exportBtn" title="Daten exportieren">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+    </button>
+    <label class="icon-btn" title="Daten importieren" style="cursor:pointer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 5 17 10"/>
+        <line x1="12" y1="5" x2="12" y2="17"/>
+      </svg>
+      <input type="file" accept=".json" id="importFile" style="display:none">
+    </label>
+  </div>
+</header>
+
+<div class="app">
+  <!-- PAGE: Neuer Eintrag -->
+  <div id="page-new" class="page active">
+    <div class="card">
+      <div class="card-title">Neue Attacke erfassen</div>
+
+      <div class="form-group">
+        <label>Datum & Uhrzeit</label>
+        <input type="datetime-local" id="inp-datetime">
+      </div>
+
+      <div class="form-group">
+        <label>Intensität <span id="intensity-value" class="intensity-badge">5</span></label>
+        <div class="intensity-wrap">
+          <div class="intensity-track" id="intensity-track"></div>
+          <div class="intensity-labels"><span>Mild</span><span>Mittel</span><span>Extrem</span></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Auslöser</label>
+        <div class="pill-group" id="trigger-group">
+          <button class="pill" data-val="Langeweile">Langeweile</button>
+          <button class="pill" data-val="Stress">Stress</button>
+          <button class="pill" data-val="Müdigkeit">Müdigkeit</button>
+          <button class="pill" data-val="Emotion">Emotion</button>
+          <button class="pill" data-val="Gewohnheit">Gewohnheit</button>
+          <button class="pill" data-val="Hunger">Echter Hunger</button>
+          <button class="pill" data-val="Geruch/Anblick">Geruch/Anblick</button>
+        </div>
+        <input type="text" id="inp-trigger-custom" placeholder="Eigener Auslöser…" style="margin-top:8px">
+      </div>
+
+      <div class="form-group">
+        <label>Reaktion</label>
+        <div class="pill-group" id="reaction-group">
+          <button class="pill" data-val="nachgegeben" data-outcome="nachgegeben">Nachgegeben 😔</button>
+          <button class="pill" data-val="teils" data-outcome="teils">Teilweise 😐</button>
+          <button class="pill" data-val="widerstanden" data-outcome="gut">Widerstanden 💪</button>
+          <button class="pill" data-val="umgelenkt" data-outcome="gut">Umgelenkt ✨</button>
+        </div>
+      </div>
+
+      <div class="form-group" id="strategy-section">
+        <label>Angewendete Strategie</label>
+        <select id="inp-strategy">
+          <option value="">— Strategie wählen —</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Notiz (optional)</label>
+        <textarea id="inp-note" placeholder="Was hast du erlebt, gedacht, gefühlt?"></textarea>
+      </div>
+
+      <button class="btn btn-primary btn-block" id="saveBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+          <polyline points="17 21 17 13 7 13 7 21"/>
+          <polyline points="7 3 7 8 15 8"/>
+        </svg>
+        Eintrag speichern
+      </button>
+    </div>
+  </div>
+
+  <!-- PAGE: Verlauf -->
+  <div id="page-history" class="page">
+    <div style="display:flex; gap:8px; margin-top:16px; flex-wrap:wrap;">
+      <select id="filter-outcome" class="btn btn-ghost btn-sm" style="font-size:13px;padding:6px 10px;flex:1;min-width:120px;">
+        <option value="">Alle Reaktionen</option>
+        <option value="nachgegeben">Nachgegeben</option>
+        <option value="teils">Teilweise</option>
+        <option value="widerstanden">Widerstanden</option>
+        <option value="umgelenkt">Umgelenkt</option>
+      </select>
+      <select id="filter-trigger" class="btn btn-ghost btn-sm" style="font-size:13px;padding:6px 10px;flex:1;min-width:120px;">
+        <option value="">Alle Auslöser</option>
+      </select>
+    </div>
+    <div class="card" id="history-list">
+      <div class="empty"><div class="empty-icon">📭</div><p>Noch keine Einträge.<br>Erfasse deine erste Attacke!</p></div>
+    </div>
+  </div>
+
+  <!-- PAGE: Statistiken -->
+  <div id="page-stats" class="page">
+    <div class="stats-grid">
+      <div class="stat-tile">
+        <span class="stat-value" id="stat-total">0</span>
+        <span class="stat-label">Attacken gesamt</span>
+      </div>
+      <div class="stat-tile">
+        <span class="stat-value good" id="stat-success">0%</span>
+        <span class="stat-label">Widerstanden / Umgelenkt</span>
+      </div>
+      <div class="stat-tile">
+        <span class="stat-value warn" id="stat-avg">—</span>
+        <span class="stat-label">Ø Intensität</span>
+      </div>
+      <div class="stat-tile">
+        <div class="streak-wrap">
+          <span class="streak-num" id="stat-streak">0</span>
+          <span class="streak-label">Tage ohne<br>Nachgeben</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Letzte 7 Tage</div>
+      <div class="chart-wrap">
+        <div class="chart-bars" id="week-chart"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Häufigste Auslöser</div>
+      <div id="trigger-stats"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Effektivste Strategien</div>
+      <div id="strategy-stats"></div>
+    </div>
+  </div>
+
+  <!-- PAGE: Strategien -->
+  <div id="page-strategies" class="page">
+    <div class="card">
+      <div class="section-head">
+        <div class="card-title" style="margin:0">Strategien-Bibliothek</div>
+        <button class="btn btn-primary btn-sm" id="addStrategyBtn">+ Neue</button>
+      </div>
+      <div id="strategy-list" style="margin-top:12px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Nav -->
+<nav>
+  <button class="active" data-page="new">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+    </svg>
+    Neu
+  </button>
+  <button data-page="history">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 2a10 10 0 1 0 10 10"/><polyline points="12 6 12 12 16 14"/>
+    </svg>
+    Verlauf
+  </button>
+  <button data-page="stats">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+    </svg>
+    Statistiken
+  </button>
+  <button data-page="strategies">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+    </svg>
+    Strategien
+  </button>
+</nav>
+
+<!-- Strategy Modal -->
+<div class="modal-overlay" id="strategyModal">
+  <div class="modal">
+    <div class="modal-title">Neue Strategie</div>
+    <div class="form-group">
+      <label>Name</label>
+      <input type="text" id="new-strategy-name" placeholder="z.B. 10 Minuten warten">
+    </div>
+    <div class="form-group">
+      <label>Beschreibung (optional)</label>
+      <textarea id="new-strategy-desc" placeholder="Wie funktioniert es?" style="min-height:60px"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn-primary" id="saveStrategyBtn">Speichern</button>
+      <button class="btn btn-ghost" id="cancelStrategyBtn">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const DEFAULT_STRATEGIES = [
+  { id: 's1', name: '10 Minuten warten', desc: 'Hungergefühl lässt oft nach 10–15 Min nach' },
+  { id: 's2', name: 'Großes Glas Wasser trinken', desc: 'Oft ist es Durst, kein Hunger' },
+  { id: 's3', name: 'Spaziergang machen', desc: 'Bewegung lenkt ab und senkt Cortisol' },
+  { id: 's4', name: '5-4-3-2-1 Atemübung', desc: 'Tief durchatmen, Sinne bewusst wahrnehmen' },
+  { id: 's5', name: 'Tee kochen', desc: 'Ritual + Wärme befriedigt orales Bedürfnis' },
+  { id: 's6', name: 'Tagebuch schreiben', desc: 'Gefühl ausdrücken statt essen' },
+  { id: 's7', name: 'Zähne putzen', desc: 'Frische im Mund reduziert Esslust' },
+  { id: 's8', name: 'Protein-Snack essen', desc: 'Bewusst kleiner gesunder Snack statt Junk' },
+];
+
+let data = {
+  entries: [],
+  strategies: [...DEFAULT_STRATEGIES]
+};
+
+let intensity = 5;
+let selectedTrigger = null;
+let selectedReaction = null;
+
+// ── Persistence ──────────────────────────────────────────────────────────
+function save() { localStorage.setItem('hh_data', JSON.stringify(data)); }
+function load() {
+  const raw = localStorage.getItem('hh_data');
+  if (raw) {
+    const loaded = JSON.parse(raw);
+    data.entries = loaded.entries || [];
+    data.strategies = loaded.strategies || DEFAULT_STRATEGIES;
+  }
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function fmt(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('de-DE', { day:'2-digit', month:'short', year:'2-digit' }) + ' · ' +
+         d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+}
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2000);
+}
+function outcomeColor(outcome) {
+  if (outcome === 'nachgegeben') return 'var(--danger)';
+  if (outcome === 'teils') return 'var(--warning)';
+  return 'var(--success)';
+}
+
+// ── Intensity Track ───────────────────────────────────────────────────────
+function buildIntensityTrack() {
+  const track = document.getElementById('intensity-track');
+  track.innerHTML = '';
+  for (let i = 1; i <= 10; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'intensity-dot';
+    if (i <= intensity) {
+      dot.classList.add(i <= 3 ? 'low' : i <= 6 ? 'mid' : 'high');
+    }
+    dot.addEventListener('click', () => { intensity = i; buildIntensityTrack(); });
+    track.appendChild(dot);
+  }
+  document.getElementById('intensity-value').textContent = intensity;
+  const badge = document.getElementById('intensity-value');
+  badge.style.background = intensity <= 3 ? 'var(--success)' : intensity <= 6 ? 'var(--warning)' : 'var(--accent)';
+}
+
+// ── Pill Groups ───────────────────────────────────────────────────────────
+function setupPills(groupId, onSelect) {
+  document.getElementById(groupId).addEventListener('click', e => {
+    const btn = e.target.closest('.pill');
+    if (!btn) return;
+    document.querySelectorAll(`#${groupId} .pill`).forEach(p => {
+      p.className = 'pill';
+      if (p.dataset.outcome) p.classList.add(/* no special */ '');
+    });
+    btn.classList.add('selected');
+    if (btn.dataset.outcome) btn.classList.add(btn.dataset.outcome);
+    onSelect(btn.dataset.val, btn.dataset.outcome);
+  });
+}
+
+// ── Strategy Select ───────────────────────────────────────────────────────
+function populateStrategySelect() {
+  const sel = document.getElementById('inp-strategy');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— Strategie wählen —</option>';
+  data.strategies.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = s.name;
+    sel.appendChild(opt);
+  });
+  sel.value = cur;
+}
+
+// ── Save Entry ─────────────────────────────────────────────────────────────
+document.getElementById('saveBtn').addEventListener('click', () => {
+  const dt = document.getElementById('inp-datetime').value;
+  if (!dt) { toast('⚠️ Bitte Datum & Uhrzeit angeben'); return; }
+  if (!selectedReaction) { toast('⚠️ Bitte Reaktion auswählen'); return; }
+
+  const triggerCustom = document.getElementById('inp-trigger-custom').value.trim();
+  const trigger = triggerCustom || selectedTrigger || 'Unbekannt';
+  const strategyId = document.getElementById('inp-strategy').value;
+  const strategy = data.strategies.find(s => s.id === strategyId);
+
+  const entry = {
+    id: uid(),
+    dt,
+    intensity,
+    trigger,
+    reaction: selectedReaction,
+    outcome: selectedReaction === 'nachgegeben' ? 'nachgegeben' : selectedReaction === 'teils' ? 'teils' : 'gut',
+    strategyId: strategyId || null,
+    strategyName: strategy ? strategy.name : null,
+    note: document.getElementById('inp-note').value.trim(),
+    createdAt: new Date().toISOString()
+  };
+
+  data.entries.unshift(entry);
+  save();
+  toast('✅ Eintrag gespeichert!');
+  resetForm();
+});
+
+function resetForm() {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  document.getElementById('inp-datetime').value = now.toISOString().slice(0, 16);
+  intensity = 5; buildIntensityTrack();
+  selectedTrigger = null; selectedReaction = null;
+  document.querySelectorAll('#trigger-group .pill, #reaction-group .pill').forEach(p => p.className = 'pill');
+  document.getElementById('inp-trigger-custom').value = '';
+  document.getElementById('inp-strategy').value = '';
+  document.getElementById('inp-note').value = '';
+}
+
+// ── History ────────────────────────────────────────────────────────────────
+function renderHistory() {
+  const filterOutcome = document.getElementById('filter-outcome').value;
+  const filterTrigger = document.getElementById('filter-trigger').value;
+
+  // Update trigger filter options
+  const triggerSel = document.getElementById('filter-trigger');
+  const curTrigger = triggerSel.value;
+  const triggers = [...new Set(data.entries.map(e => e.trigger))];
+  triggerSel.innerHTML = '<option value="">Alle Auslöser</option>';
+  triggers.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t; opt.textContent = t;
+    triggerSel.appendChild(opt);
+  });
+  triggerSel.value = curTrigger;
+
+  let entries = data.entries;
+  if (filterOutcome) entries = entries.filter(e => e.reaction === filterOutcome || e.outcome === filterOutcome);
+  if (filterTrigger) entries = entries.filter(e => e.trigger === filterTrigger);
+
+  const container = document.getElementById('history-list');
+  if (entries.length === 0) {
+    container.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Keine Einträge gefunden.</p></div>';
+    return;
+  }
+  container.innerHTML = entries.map(e => `
+    <div class="entry-item" data-id="${e.id}">
+      <div class="entry-dot" style="background:${outcomeColor(e.outcome)}"></div>
+      <div class="entry-meta">
+        <div class="entry-header">
+          <span class="entry-title">Intensität ${e.intensity}/10</span>
+          <span class="entry-time">${fmt(e.dt)}</span>
+        </div>
+        <div class="entry-tags">
+          <span class="tag">${e.trigger}</span>
+          ${e.strategyName ? `<span class="tag">💡 ${e.strategyName}</span>` : ''}
+          <span class="tag outcome-${e.outcome}">${reactionLabel(e.reaction)}</span>
+        </div>
+        ${e.note ? `<div class="entry-note">${escHtml(e.note)}</div>` : ''}
+      </div>
+      <div class="entry-actions">
+        <button class="icon-btn del-btn" data-id="${e.id}" title="Löschen" style="color:var(--danger)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.del-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!confirm('Eintrag löschen?')) return;
+      data.entries = data.entries.filter(e => e.id !== btn.dataset.id);
+      save(); renderHistory(); renderStats();
+    });
+  });
+}
+
+function reactionLabel(r) {
+  return { nachgegeben: 'Nachgegeben 😔', teils: 'Teilweise 😐', widerstanden: 'Widerstanden 💪', umgelenkt: 'Umgelenkt ✨' }[r] || r;
+}
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Stats ──────────────────────────────────────────────────────────────────
+function renderStats() {
+  const entries = data.entries;
+  const total = entries.length;
+  const successCount = entries.filter(e => e.outcome === 'gut').length;
+  const successRate = total ? Math.round((successCount / total) * 100) : 0;
+  const avgIntensity = total ? (entries.reduce((s,e) => s + e.intensity, 0) / total).toFixed(1) : '—';
+
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-success').textContent = successRate + '%';
+  document.getElementById('stat-avg').textContent = avgIntensity;
+
+  // Streak: days without "nachgegeben"
+  let streak = 0;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dayMs = 86400000;
+  for (let d = 0; ; d++) {
+    const dayStart = new Date(today - d * dayMs);
+    const dayEnd = new Date(dayStart.getTime() + dayMs);
+    const dayEntries = entries.filter(e => { const dt = new Date(e.dt); return dt >= dayStart && dt < dayEnd; });
+    if (dayEntries.length === 0 && d > 0) break;
+    if (dayEntries.some(e => e.outcome === 'nachgegeben')) break;
+    if (dayEntries.length > 0 || d === 0) streak++;
+    if (d > 365) break;
+  }
+  document.getElementById('stat-streak').textContent = streak;
+
+  // Week chart
+  const chart = document.getElementById('week-chart');
+  chart.innerHTML = '';
+  const days = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today - i * dayMs);
+    const d1 = new Date(d); d1.setHours(0,0,0,0);
+    const d2 = new Date(d1.getTime() + dayMs);
+    const dayE = entries.filter(e => { const dt = new Date(e.dt); return dt >= d1 && dt < d2; });
+    const count = dayE.length;
+    const hasGiven = dayE.some(e => e.outcome === 'nachgegeben');
+    const col = document.createElement('div');
+    col.className = 'chart-col';
+    const maxH = 70;
+    const h = count ? Math.max(8, (count / Math.max(...Array.from({length:7},(_,k) => {
+      const dd = new Date(today - k * dayMs); dd.setHours(0,0,0,0);
+      const dd2 = new Date(dd.getTime() + dayMs);
+      return entries.filter(e => { const dt = new Date(e.dt); return dt >= dd && dt < dd2; }).length;
+    }), 1)) * maxH) : 0;
+    col.innerHTML = `
+      <div class="chart-bar" style="height:${h}px;background:${hasGiven?'var(--danger)':count?'var(--success)':'var(--border)'}"></div>
+      <span class="chart-day-label">${days[d.getDay() === 0 ? 6 : d.getDay()-1]}</span>
+    `;
+    chart.appendChild(col);
+  }
+
+  // Trigger stats
+  const trigCounts = {};
+  entries.forEach(e => { trigCounts[e.trigger] = (trigCounts[e.trigger] || 0) + 1; });
+  const maxTrig = Math.max(...Object.values(trigCounts), 1);
+  const trigList = Object.entries(trigCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  document.getElementById('trigger-stats').innerHTML = trigList.length ? trigList.map(([t,c]) => `
+    <div class="strategy-item">
+      <div style="flex:1">
+        <div class="strategy-name">${t}</div>
+        <div class="strategy-bar"><div class="strategy-bar-fill" style="width:${(c/maxTrig)*100}%"></div></div>
+      </div>
+      <span class="strategy-count">${c}×</span>
+    </div>
+  `).join('') : '<div class="empty" style="padding:20px"><p>Noch keine Daten</p></div>';
+
+  // Strategy stats
+  const stratCounts = {};
+  entries.filter(e => e.strategyId).forEach(e => { stratCounts[e.strategyName] = (stratCounts[e.strategyName] || 0) + 1; });
+  const maxStrat = Math.max(...Object.values(stratCounts), 1);
+  const stratList = Object.entries(stratCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  document.getElementById('strategy-stats').innerHTML = stratList.length ? stratList.map(([n,c]) => `
+    <div class="strategy-item">
+      <div style="flex:1">
+        <div class="strategy-name">${n}</div>
+        <div class="strategy-bar"><div class="strategy-bar-fill" style="width:${(c/maxStrat)*100}%"></div></div>
+      </div>
+      <span class="strategy-count">${c}×</span>
+    </div>
+  `).join('') : '<div class="empty" style="padding:20px"><p>Noch keine Strategien verwendet</p></div>';
+}
+
+// ── Strategies Page ────────────────────────────────────────────────────────
+function renderStrategies() {
+  const container = document.getElementById('strategy-list');
+  // Count usage
+  const usageCounts = {};
+  data.entries.filter(e => e.strategyId).forEach(e => { usageCounts[e.strategyId] = (usageCounts[e.strategyId] || 0) + 1; });
+
+  container.innerHTML = data.strategies.map(s => `
+    <div class="strategy-item">
+      <div style="flex:1">
+        <div class="strategy-name">${escHtml(s.name)}</div>
+        ${s.desc ? `<div class="strategy-count" style="margin-top:2px">${escHtml(s.desc)}</div>` : ''}
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="strategy-count">${usageCounts[s.id] || 0}×</span>
+        ${!DEFAULT_STRATEGIES.find(d => d.id === s.id) ? `
+          <button class="icon-btn del-strategy-btn" data-id="${s.id}" style="color:var(--danger)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        ` : ''}
+      </div>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.del-strategy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      data.strategies = data.strategies.filter(s => s.id !== btn.dataset.id);
+      save(); renderStrategies(); populateStrategySelect();
+    });
+  });
+}
+
+// ── Strategy Modal ─────────────────────────────────────────────────────────
+document.getElementById('addStrategyBtn').addEventListener('click', () => {
+  document.getElementById('strategyModal').classList.add('open');
+  document.getElementById('new-strategy-name').focus();
+});
+document.getElementById('cancelStrategyBtn').addEventListener('click', closeModal);
+document.getElementById('strategyModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+function closeModal() { document.getElementById('strategyModal').classList.remove('open'); }
+document.getElementById('saveStrategyBtn').addEventListener('click', () => {
+  const name = document.getElementById('new-strategy-name').value.trim();
+  if (!name) { toast('⚠️ Name eingeben'); return; }
+  const strategy = { id: uid(), name, desc: document.getElementById('new-strategy-desc').value.trim() };
+  data.strategies.push(strategy);
+  save(); renderStrategies(); populateStrategySelect();
+  document.getElementById('new-strategy-name').value = '';
+  document.getElementById('new-strategy-desc').value = '';
+  closeModal(); toast('✅ Strategie gespeichert!');
+});
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+document.querySelectorAll('nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const page = btn.dataset.page;
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + page).classList.add('active');
+    if (page === 'history') renderHistory();
+    if (page === 'stats') renderStats();
+    if (page === 'strategies') renderStrategies();
+  });
+});
+
+document.getElementById('filter-outcome').addEventListener('change', renderHistory);
+document.getElementById('filter-trigger').addEventListener('change', renderHistory);
+
+// ── Theme ──────────────────────────────────────────────────────────────────
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('hh_theme', t);
+}
+document.getElementById('themeBtn').addEventListener('click', () => {
+  const current = localStorage.getItem('hh_theme') || 'dark';
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+});
+
+// ── Export / Import ────────────────────────────────────────────────────────
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const date = new Date().toISOString().slice(0,10);
+  a.download = `heisshunger_${date}.json`;
+  a.click();
+  toast('📥 Daten exportiert!');
+});
+
+document.getElementById('importFile').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const imported = JSON.parse(ev.target.result);
+      if (!imported.entries || !imported.strategies) throw new Error('Ungültiges Format');
+      if (!confirm(`${imported.entries.length} Einträge importieren? Bestehende Daten werden zusammengeführt.`)) return;
+      // Merge: skip duplicate ids
+      const existingIds = new Set(data.entries.map(e => e.id));
+      imported.entries.forEach(e => { if (!existingIds.has(e.id)) data.entries.push(e); });
+      const existingStratIds = new Set(data.strategies.map(s => s.id));
+      imported.strategies.forEach(s => { if (!existingStratIds.has(s.id)) data.strategies.push(s); });
+      data.entries.sort((a,b) => new Date(b.dt) - new Date(a.dt));
+      save(); populateStrategySelect();
+      toast(`✅ ${imported.entries.length} Einträge importiert!`);
+    } catch(err) { toast('❌ Fehler beim Import: ' + err.message); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+load();
+applyTheme(localStorage.getItem('hh_theme') || 'dark');
+buildIntensityTrack();
+populateStrategySelect();
+setupPills('trigger-group', (val) => { selectedTrigger = val; });
+setupPills('reaction-group', (val) => { selectedReaction = val; });
+resetForm();
+</script>
+</body>
+</html>
