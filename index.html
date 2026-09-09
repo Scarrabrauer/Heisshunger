@@ -546,7 +546,6 @@ function setupPills(groupId, onSelect) {
     if (!btn) return;
     document.querySelectorAll(`#${groupId} .pill`).forEach(p => {
       p.className = 'pill';
-      if (p.dataset.outcome) p.classList.add(/* no special */ '');
     });
     btn.classList.add('selected');
     if (btn.dataset.outcome) btn.classList.add(btn.dataset.outcome);
